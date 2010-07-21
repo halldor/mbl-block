@@ -1,0 +1,65 @@
+<html>
+    <head>
+        <script>
+            // TODO(halldor): make it permanent (unless it's incognito, then it's fine, just fine)
+            blocked = {}
+
+            function showIcon(tab) {
+                var username = tab.url.match(/http\:\/\/([^.]*)/)[1],
+                    path = 'icons/icon19.png';
+                if(username in blocked) {
+                    path = 'icons/blocked19.png';
+                }
+                chrome.pageAction.setIcon({
+                    tabId: tab.id,
+                    path: path
+                });
+                chrome.pageAction.show(tab.id);
+            }
+
+            function checkURL(tabId, changeInfo, tab) {
+
+                if (tab.url.indexOf('blog.is') > -1) {
+                    showIcon(tab);
+                }
+            }
+
+            function changeBlockStatus(tab) {
+                var username = tab.url.match(/http\:\/\/([^.]*)/)[1],
+                    msg;
+
+                if(username in blocked) {
+                    delete blocked[username];
+                    msg = {unblocked: [username]}
+                } else {
+                    blocked[username] = true;
+                    msg = {blocked: [username]}
+                }
+                showIcon(tab);
+                chrome.windows.getAll({populate: true}, function(windows) {
+                    for(win in windows) {
+                        for(tab in win.tabs) {
+                            chrome.tabs.sendRequest(tab.id, msg, function(res) {
+                            }
+                        }
+                    }
+                });
+            }
+
+            function isBlocked(request, sender, sendResponse) {
+                var bl = false;
+                if(request.username in blocked) {
+                    bl = true;
+                }
+                sendResponse({
+                    blocked: bl
+                });
+            }
+
+            chrome.tabs.onUpdated.addListener(checkURL);
+            chrome.pageAction.onClicked.addListener(changeBlockStatus);
+            chrome.extension.onRequest.addListener(isBlocked);
+        </script>
+    </head>
+</html>
+

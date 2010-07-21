@@ -1,0 +1,19 @@
+{
+    "name": "Mogga block",
+    "version": "0.1",
+    "description": "Block unwanted bloggers from being linked to from mbl.is",
+    "background_page": "background.html",
+    "permissions": [
+        "tabs"
+    ],
+    "content_scripts": [
+        {
+            "matches": ["http://*.mbl.is/*"],
+            "js": ["blocker.js"]
+        }
+    ],
+    "page_action": {
+        "default_icon": "icons/icon19.png",
+        "default_title": "Block this blog from mbl.is"
+    }
+}
