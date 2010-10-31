@@ -13,7 +13,7 @@
         }
     ],
     "page_action": {
-        "default_icon": "icons/icon19.png",
-        "default_title": "Block this blog from mbl.is"
+        "default_icon": "resources/icon-19.png",
+        "default_title": "Block this blogger from mbl.is"
     }
 }

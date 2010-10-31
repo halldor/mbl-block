@@ -14,37 +14,50 @@ for(var i = 0; i < blog_elements.length; i++) {
     }
     blogs[username] = {
         element: blog_elements[i]
-    }
-    chrome.extension.sendRequest({username: username}, function(response) {
-        if(response.blocked) {
-            hideBlog(username);
-        }
-    });
+    };
+    (function(username) {
+		chrome.extension.sendRequest({username: username}, function(response) {
+			if(response.blocked) {
+				hideBlog(username);
+			}
+		});
+	})(username);
 }
 
 function hideBlog(username) {
-    var blog = blogs[username].element;
-    blog.parentElement.removeChild(blog);
+    var blog = blogs[username].element,
+		name = blog.getElementsByTagName('div')[0],
+		anchor = blog.getElementsByTagName('a')[0];
+	name.style.color = '#eee';
+	anchor.style.color = '#ddd';
+	anchor.onclick = function() {
+		// TODO(halldor): subtle notification that this blog might be aweful
+		return false;
+	}
 }
 
 function showBlog(username) {
     if(username in blogs) {
-        var list = document.getElementsByClassName("newsblog")[0].getElementsByTagName("ul")[0];
-        list.appendChild(blogs[username].element);
+		var blog = blogs[username].element,
+			name = blog.getElementsByTagName('div')[0],
+			anchor = blog.getElementsByTagName('a')[0];
+		name.style.color = '';
+		anchor.style.color = '';
+		anchor.onclick = null;
     }
 }
 
 function showOrHide(request, sender, sendResponse) {
     if(request.blocked) {
-        for(var username in request.blocked) {
-            hideBlog(username);
+        for(var idx in request.blocked) {
+            hideBlog(request.blocked[idx]);
         }
     } else if(request.unblocked) {
-        for(var username in request.unblocked) {
-            showBlog(username);
+        for(var idx in request.unblocked) {
+            showBlog(request.unblocked[idx]);
         }
     }
     sendResponse();
 }
 
-chrome.extensions.onRequest.addListener(showOrHide);
+chrome.extension.onRequest.addListener(showOrHide);

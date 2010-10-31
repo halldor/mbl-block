@@ -1,59 +1,98 @@
 <html>
     <head>
         <script>
-            // TODO(halldor): make it permanent (unless it's incognito, then it's fine, just fine)
-            blocked = {}
+			blockdb = openDatabase('block', '0.1', 'blocked blog.is users', 5*1024*1024);
+			blockdb.transaction(function(tx) {
+				tx.executeSql('CREATE TABLE IF NOT EXISTS ' +
+					'block(username VARCHAR(255) PRIMARY KEY, reason TEXT, created DATETIME)', []
+				);
+			});
 
-            function showIcon(tab) {
-                var username = tab.url.match(/http\:\/\/([^.]*)/)[1],
-                    path = 'icons/icon19.png';
-                if(username in blocked) {
-                    path = 'icons/blocked19.png';
+            function showIcon(tab, blocked) {
+                var path = 'resources/icon-19.png',
+					title = 'Block this blogger from mbl.is';
+                if(blocked) {
+                    path = 'resources/blocked-19.png';
+					title = 'Unblock this blogger from mbl.is';
                 }
                 chrome.pageAction.setIcon({
                     tabId: tab.id,
                     path: path
                 });
+				chrome.pageAction.setTitle({
+					tabId: tab.id,
+					title: title
+				});
                 chrome.pageAction.show(tab.id);
             }
 
             function checkURL(tabId, changeInfo, tab) {
 
                 if (tab.url.indexOf('blog.is') > -1) {
-                    showIcon(tab);
+					var username = tab.url.match(/http\:\/\/([^.]*)/)[1];
+					blockdb.transaction(function(tx) {
+						tx.executeSql('SELECT * FROM block WHERE username = ?', [username], function(tx, result) {
+							showIcon(tab, Boolean(result.rows.length));
+						});
+					});
                 }
             }
 
             function changeBlockStatus(tab) {
                 var username = tab.url.match(/http\:\/\/([^.]*)/)[1],
-                    msg;
+                    update_all = function(message) {
+						chrome.windows.getAll({populate: true}, function(windows) {
+							for(var win in windows) {
+								for(var tab in windows[win].tabs) {
+									chrome.tabs.sendRequest(windows[win].tabs[tab].id, message);
+								}
+							}
+						});
+					};
 
-                if(username in blocked) {
-                    delete blocked[username];
-                    msg = {unblocked: [username]}
-                } else {
-                    blocked[username] = true;
-                    msg = {blocked: [username]}
-                }
-                showIcon(tab);
-                chrome.windows.getAll({populate: true}, function(windows) {
-                    for(win in windows) {
-                        for(tab in win.tabs) {
-                            chrome.tabs.sendRequest(tab.id, msg, function(res) {
-                            }
-                        }
-                    }
-                });
+				blockdb.transaction(function(tx) {
+					tx.executeSql('SELECT * FROM block WHERE username = ?', [username], function(tx, result) {
+						if(result.rows.length) {
+							blockdb.transaction(function(tx) {
+								tx.executeSql(
+									'DELETE FROM block WHERE username = ?',
+									[username],
+									function() {
+										update_all({unblocked: [username]});
+										showIcon(tab, false);
+									},
+									function() {
+										console.error(arguments);
+									}
+								);
+							});
+						} else {
+							blockdb.transaction(function(tx) {
+								tx.executeSql(
+									'INSERT INTO block(username, reason, created) VALUES (?, ?, ?)',
+									[username, '', new Date()],
+									function() {
+										update_all({blocked: [username]});
+										showIcon(tab, true);
+									},
+									function() {
+										console.error(arguments);
+									}
+								);
+							});
+						}
+					});
+				});
             }
 
             function isBlocked(request, sender, sendResponse) {
-                var bl = false;
-                if(request.username in blocked) {
-                    bl = true;
-                }
-                sendResponse({
-                    blocked: bl
-                });
+				blockdb.transaction(function(tx) {
+					tx.executeSql('SELECT * FROM block WHERE username = ?', [request.username], function(tx, result) {
+						sendResponse({
+							blocked: Boolean(result.rows.length)
+						});
+					});
+				});
             }
 
             chrome.tabs.onUpdated.addListener(checkURL);
